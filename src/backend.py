@@ -177,28 +177,47 @@ async def generate_quiz(request: GenerateQuizRequest):
     docs = _vector_db.similarity_search(request.topic, k=8)
     context = "\n\n".join(doc.page_content for doc in docs)
 
-    # The schema mirrors the frontend's expected quiz JSON so the response can be
-    # loaded directly into app state without any client-side transformation.
-    prompt = f"""You are a JSON-only AI. Based on the CONTEXT below, generate {request.num_questions} multiple-choice quiz questions about "{request.topic}".
+    # Few-shot prompt: one complete context→JSON example anchors the output
+    # format so the LLM cannot drift from the schema.  The "--- YOUR TURN ---"
+    # separator keeps the example clearly separated from the live request.
+    prompt = f"""You are a JSON-only quiz generator. Read the CONTEXT and produce exactly {request.num_questions} multiple-choice questions about "{request.topic}".
 
 STRICT RULES:
-- Output ONLY valid JSON. No text outside the JSON structure.
-- Use exactly this schema:
+1. Output ONLY valid JSON. No commentary, no markdown fences, no text outside the JSON.
+2. "correctAnswer" must be a 0-based integer index into that question's "options" array.
+3. Every "explanation" must cite a fact stated directly in the CONTEXT — never invent.
+4. Produce exactly {request.num_questions} questions inside the "questions" array.
 
+--- EXAMPLE ---
+
+CONTEXT:
+Quang hợp là quá trình thực vật sử dụng ánh sáng mặt trời, nước và khí CO2 để tổng hợp glucose và giải phóng oxy. Quá trình này diễn ra bên trong lục lạp, nơi chứa chất diệp lục có khả năng hấp thụ ánh sáng.
+
+TOPIC: Quang hợp
+NUM_QUESTIONS: 1
+
+OUTPUT:
 {{
-  "title": "Quiz: {request.topic}",
+  "title": "Quiz: Quang hợp",
   "questions": [
     {{
-      "question": "Question text here?",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctAnswer": 0,
-      "explanation": "Explanation of why the answer is correct."
+      "question": "Quang hợp diễn ra ở bào quan nào trong tế bào thực vật?",
+      "options": ["Ti thể", "Lục lạp", "Nhân tế bào", "Không bào"],
+      "correctAnswer": 1,
+      "explanation": "Theo tài liệu, quang hợp diễn ra bên trong lục lạp — nơi chứa chất diệp lục hấp thụ ánh sáng mặt trời."
     }}
   ]
 }}
 
+--- YOUR TURN ---
+
 CONTEXT:
-{context}"""
+{context}
+
+TOPIC: {request.topic}
+NUM_QUESTIONS: {request.num_questions}
+
+OUTPUT:"""
 
     quiz_llm = Ollama(model="llama3.2", temperature=0.1, format="json")
     raw = quiz_llm.invoke(prompt)
@@ -211,5 +230,17 @@ CONTEXT:
     questions = quiz_data.get("questions")
     if not isinstance(questions, list) or len(questions) == 0:
         raise HTTPException(status_code=422, detail="LLM response missing valid 'questions' array. Please try again.")
+
+    # Validate each question has the required fields so the frontend never
+    # receives a partially-hallucinated schema.
+    for i, q in enumerate(questions):
+        if not isinstance(q.get("question"), str) or not q["question"].strip():
+            raise HTTPException(status_code=422, detail=f"Question {i} is missing a 'question' string.")
+        if not isinstance(q.get("options"), list) or len(q["options"]) < 2:
+            raise HTTPException(status_code=422, detail=f"Question {i} must have at least 2 options.")
+        if not isinstance(q.get("correctAnswer"), int):
+            raise HTTPException(status_code=422, detail=f"Question {i} 'correctAnswer' must be an integer index.")
+        if q["correctAnswer"] < 0 or q["correctAnswer"] >= len(q["options"]):
+            raise HTTPException(status_code=422, detail=f"Question {i} 'correctAnswer' index is out of range.")
 
     return quiz_data

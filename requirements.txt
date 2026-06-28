@@ -1,11 +1,27 @@
-streamlit==1.32.0
-pypdf==4.1.0
-langchain==0.1.13
-langchain-community==0.0.29
-langchain-huggingface==0.0.2
-chromadb==0.4.24
-sentence-transformers==2.6.1
+# Web framework
 fastapi==0.110.0
 uvicorn[standard]==0.29.0
 python-multipart==0.0.9
+
+# PDF parsing
+pypdf==4.1.0
+
+# LangChain core + community (includes Ollama integration)
+langchain==0.3.7
+langchain-community==0.3.7
+langchain-huggingface==0.1.2
+
+# Vector store
+chromadb==0.4.24
+
+# Embeddings model runtime
+sentence-transformers==2.6.1
+
+# Ollama Python client
+ollama
+
+# Text-to-speech
 gtts==2.5.1
+
+# Optional: standalone Streamlit prototype
+# streamlit==1.32.0

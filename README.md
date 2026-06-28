@@ -57,11 +57,9 @@ Day5-Notebook_and_quiz/
 │
 ├── .gitignore              
 └── requirements.txt          # Danh sách các thư viện
----
-### 2. Phần Hướng dẫn cài đặt (Local Setup)
-Sử dụng khối ````bash ```` để tự động tô màu các câu lệnh Terminal, giúp người đọc dễ dàng copy lệnh để chạy:
 
-```markdown
+
+
  Hướng dẫn Cài đặt & Khởi chạy Cục bộ (Local Setup)
 Để chạy dự án này trên máy tính cá nhân của bạn sau khi kéo (pull) mã nguồn về, hãy thực hiện chính xác theo quy trình 3 giai đoạn dưới đây:
 
